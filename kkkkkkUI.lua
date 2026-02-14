@@ -1,3 +1,8 @@
+--[[
+	User Interface Library
+	Made by Late
+]]
+
 --// Connections
 local GetService = game.GetService
 local Connect = game.Loaded.Connect
@@ -296,7 +301,6 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 	local Examples = {};
 	local Opened = true;
 	local Maximized = false;
-	local Minimized = false;
 	local BlurEnabled = false
 
 	for Index, Example in next, Window:GetDescendants() do
@@ -319,52 +323,6 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 	if Settings.MinimizeKeybind then
 		Setup.Keybind = Settings.MinimizeKeybind
-	end
-
-	--// Mini Title Bar for Minimize
-	local MiniBar = nil
-	local function CreateMiniBar()
-		if MiniBar then return end
-
-		MiniBar = Instance.new("Frame")
-		MiniBar.Name = "MiniTitleBar"
-		MiniBar.Size = UDim2.new(0, 220, 0, 32)
-		MiniBar.Position = UDim2.new(0.5, -110, 1, -40) -- di bawah layar agak ke atas
-		MiniBar.BackgroundColor3 = Theme.Secondary
-		MiniBar.BorderSizePixel = 0
-		MiniBar.Parent = Screen
-		MiniBar.Visible = false
-
-		local title = Instance.new("TextLabel", MiniBar)
-		title.Size = UDim2.new(1, -60, 1, 0)
-		title.Position = UDim2.new(0, 8, 0, 0)
-		title.BackgroundTransparency = 1
-		title.TextColor3 = Theme.Title
-		title.TextXAlignment = Enum.TextXAlignment.Left
-		title.Font = Enum.Font.SourceSansBold
-		title.TextSize = 14
-		title.Text = Settings.Title or "Window"
-
-		local restoreBtn = Instance.new("TextButton", MiniBar)
-		restoreBtn.Name = "Restore"
-		restoreBtn.Size = UDim2.new(0, 24, 0, 24)
-		restoreBtn.Position = UDim2.new(1, -32, 0.5, -12)
-		restoreBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
-		restoreBtn.Text = "□"
-		restoreBtn.TextColor3 = Color3.new(1,1,1)
-		restoreBtn.Font = Enum.Font.SourceSansBold
-
-		restoreBtn.MouseButton1Click:Connect(function()
-			Minimized = false
-			MiniBar.Visible = false
-			Window.Visible = true
-			Animations:Open(Window, Setup.Transparency)
-			if BlurEnabled then
-				Blurs[Settings.Title].root.Parent = workspace.CurrentCamera
-			end
-		end)
-
-		Drag(MiniBar) -- biar bisa digeser
 	end
 
 	--// Animate
@@ -397,42 +355,16 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 					Close()
 				elseif Name == "Maximize" then
 					if Maximized then
-						-- Restore ke ukuran & posisi semula
 						Maximized = false
-						Tween(Window, 0.2, { 
-							Size     = Window:GetAttribute("LastSize") or Setup.Size,
-							Position = Window:GetAttribute("LastPosition") or UDim2.new(0.5, 0, 0.5, 0),
-							AnchorPoint = Window:GetAttribute("LastAnchor") or Vector2.new(0.5, 0.5)
-						})
+						Tween(Window, .15, { Size = Setup.Size });
 					else
-						-- Maximize
 						Maximized = true
-
-						-- Simpan ukuran & posisi sebelum maximize
-						Window:SetAttribute("LastSize", Window.Size)
-						Window:SetAttribute("LastPosition", Window.Position)
-						Window:SetAttribute("LastAnchor", Window.AnchorPoint)
-
-						Tween(Window, 0.2, { 
-							Size       = UDim2.fromScale(1, 1),
-							Position   = UDim2.fromScale(0.5, 0.5),
-							AnchorPoint = Vector2.new(0.5, 0.5)
-						})
+						Tween(Window, .15, { Size = UDim2.fromScale(1, 1), Position = UDim2.fromScale(0.5, 0.5 )});
 					end
 				elseif Name == "Minimize" then
-					if not Minimized then
-						Minimized = true
-						CreateMiniBar()
-						MiniBar.Visible = true
-
-						Animations:Close(Window)
-						task.delay(0.3, function()
-							Window.Visible = false
-							if BlurEnabled then
-								Blurs[Settings.Title].root.Parent = nil
-							end
-						end)
-					end
+					Opened = false
+					Window.Visible = false
+					Blurs[Settings.Title].root.Parent = nil
 				end
 			end)
 		end
@@ -752,7 +684,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 						Text.Text = Index
 
 						for _, Others in next, Example:GetChildren() do
-							if Others:IsA("TextButton") and Others \~= Button then
+							if Others:IsA("TextButton") and Others ~= Button then
 								Others.BackgroundColor3 = Theme.Component
 							end
 						end
@@ -967,7 +899,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 
 		Classes = {
 			["ImageLabel"] = function(Label)
-				if Label.Image \~= "rbxassetid://6644618143" then
+				if Label.Image ~= "rbxassetid://6644618143" then
 					Label.ImageColor3 = Theme.Icon
 				end
 			end,
@@ -1062,16 +994,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparen
 	end
 
 	SetProperty(Window, { Size = Settings.Size, Visible = true, Parent = Screen });
-	-- Animations:Open(Window, Settings.Transparency or 0) -- Dihapus agar tidak terbuka otomatis
-
-	-- Inisialisasi dalam keadaan minimize
-	Minimized = true
-	CreateMiniBar()
-	MiniBar.Visible = true
-	Window.Visible = false
-	if BlurEnabled then
-		Blurs[Settings.Title].root.Parent = nil
-	end
+	Animations:Open(Window, Settings.Transparency or 0)
 
 	return Options
 end
