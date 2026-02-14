@@ -1,724 +1,1079 @@
--- ===== Helper =====
-local function makeUI(parent, class, props)
-    local obj = Instance.new(class)
-    for k, v in pairs(props) do obj[k] = v end
-    obj.Parent = parent
-    return obj
+--// Connections
+local GetService = game.GetService
+local Connect = game.Loaded.Connect
+local Wait = game.Loaded.Wait
+local Clone = game.Clone 
+local Destroy = game.Destroy 
+
+if (not game:IsLoaded()) then
+	local Loaded = game.Loaded
+	Loaded.Wait(Loaded);
 end
 
--- ===== Blur =====
-local uiBlur = makeUI(Lighting, "BlurEffect", {
-    Size = 20,
-    Enabled = false
-})
-
--- ===== ScreenGui =====
-local screenGui = makeUI(LocalPlayer:WaitForChild("PlayerGui"), "ScreenGui", {
-    Name = "ModernAdminUI",
-    ResetOnSpawn = false
-})
-
--- ===== Main Frame =====
-local mainFrame = makeUI(screenGui, "Frame", {
-    AnchorPoint = Vector2.new(0.5, 0),
-    Position = UDim2.new(0.5, 0, 0.2, 0),
-    Size = UDim2.new(0, 260, 0, 40),
-    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-    BackgroundTransparency = 0.3,
-    BorderSizePixel = 0,
-    Active = true
-})
-makeUI(mainFrame, "UICorner", {CornerRadius = UDim.new(0, 12)})
-
--- ===== Shadow & Stroke =====
-local shadow = makeUI(mainFrame, "ImageLabel", {
-    BackgroundTransparency = 1,
-    Image = "rbxassetid://5028857084",
-    ImageTransparency = 0.75,
-    ScaleType = Enum.ScaleType.Slice,
-    SliceCenter = Rect.new(24, 24, 276, 276),
-    Size = UDim2.new(1, 0, 1, 0),
-    Position = UDim2.new(0, 0, 0, 0),
-    ZIndex = -1
-})
-local stroke = makeUI(mainFrame, "UIStroke", {
-    Color = Color3.fromRGB(70, 70, 70),
-    Thickness = 1.2,
-    Transparency = 0.2
-})
-
--- ===== Header =====
-local header = makeUI(mainFrame, "Frame", {
-    Size = UDim2.new(1, 0, 0, 28),
-    BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-    BackgroundTransparency = 0.2,
-    BorderSizePixel = 0,
-    Active = true
-})
-makeUI(header, "UICorner", {CornerRadius = UDim.new(0, 12)})
-makeUI(header, "UIListLayout", {
-    FillDirection = Enum.FillDirection.Horizontal,
-    HorizontalAlignment = Enum.HorizontalAlignment.Left,
-    VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 6)
-})
-makeUI(header, "TextLabel", {
-    Text = "Modern Admin",
-    Font = Enum.Font.GothamSemibold,
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    TextSize = 12,
-    BackgroundTransparency = 1,
-    Size = UDim2.new(1, -46, 1, 0),
-    TextXAlignment = Enum.TextXAlignment.Left
-})
-
--- ===== Minimize Button =====
-local minimizeButton = makeUI(header, "TextButton", {
-    Text = "+",
-    Font = Enum.Font.GothamBold,
-    TextSize = 16,
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    BackgroundTransparency = 0.3,
-    BackgroundColor3 = Color3.fromRGB(50, 50, 50),
-    Size = UDim2.new(0, 24, 0, 24)
-})
-makeUI(minimizeButton, "UICorner", {CornerRadius = UDim.new(1, 0)})
-
--- ===== Scrollable Options =====
-local optionsFrame = makeUI(mainFrame, "ScrollingFrame", {
-    Position = UDim2.new(0, 0, 0, 28),
-    Size = UDim2.new(1, 0, 1, -28),
-    BackgroundTransparency = 1,
-    ScrollBarThickness = 6,
-    CanvasSize = UDim2.new(0, 0, 0, 0),
-    VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
-    Active = true
-})
-local layout = makeUI(optionsFrame, "UIListLayout", {
-    Padding = UDim.new(0, 5),
-    HorizontalAlignment = Enum.HorizontalAlignment.Center,
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    VerticalAlignment = Enum.VerticalAlignment.Top
-})
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    optionsFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
-end)
-optionsFrame.Visible = false
-
--- ===== Auto Size Calculator =====
-local function calculateMaximizedSize()
-    local optionCount = #UIState.Toggles + #UIState.Sliders + #UIState.Dropdowns + #UIState.Texts
-    local heightPerOption = 40
-    local maxHeight = 400  -- Batas maksimal tinggi
-    local calculatedHeight = math.min(optionCount * heightPerOption + 30, maxHeight)
-    return UDim2.new(0, 260, 0, calculatedHeight)
-end
-
--- ===== Global UI State =====
-local UIState = {
-    Toggles = {},
-    Sliders = {},
-    Dropdowns = {},
-    Texts = {}
+--// Important 
+local Setup = {
+	Keybind = Enum.KeyCode.LeftControl,
+	Transparency = 0.2,
+	ThemeMode = "Dark",
+	Size = nil,
 }
 
--- ===== Tween Setup =====
-local isMinimized = true
-local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local minimizedSize = UDim2.new(0, 260, 0, 40)
-local maximizedSize = calculateMaximizedSize()  -- Auto calculate
-mainFrame.Size = minimizedSize
+local Theme = { --// (Dark Theme)
+	--// Frames:
+	Primary = Color3.fromRGB(30, 30, 30),
+	Secondary = Color3.fromRGB(35, 35, 35),
+	Component = Color3.fromRGB(40, 40, 40),
+	Interactables = Color3.fromRGB(45, 45, 45),
 
--- ===== Dragging =====
-local dragging, dragStart, startPos
-local function disableControls()
-    return Enum.ContextActionResult.Sink
-end
-header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        CAS:BindAction("DisableControls", disableControls, false, unpack(Enum.UserInputType:GetEnumItems()))
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-                CAS:UnbindAction("DisableControls")
-            end
-        end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
+	--// Text:
+	Tab = Color3.fromRGB(200, 200, 200),
+	Title = Color3.fromRGB(240,240,240),
+	Description = Color3.fromRGB(200,200,200),
 
--- ===== Minimize / Maximize =====
-local function toggleMinimize()
-    if isMinimized then
-        isMinimized = false
-        minimizeButton.Text = "-"
-        uiBlur.Enabled = true
-        optionsFrame.Visible = true
-        TweenService:Create(mainFrame, tweenInfo, {Size = maximizedSize}):Play()
-        TweenService:Create(shadow, tweenInfo, {Size = maximizedSize, ImageTransparency = 0.6}):Play()
-        TweenService:Create(stroke, tweenInfo, {Transparency = 0, Thickness = 1.8}):Play()
-    else
-        isMinimized = true
-        minimizeButton.Text = "+"
-        uiBlur.Enabled = false
-        optionsFrame.Visible = false
-        TweenService:Create(mainFrame, tweenInfo, {Size = minimizedSize}):Play()
-        TweenService:Create(shadow, tweenInfo, {Size = minimizedSize, ImageTransparency = 0.75}):Play()
-        TweenService:Create(stroke, tweenInfo, {Transparency = 0.2, Thickness = 1.2}):Play()
-    end
-end
-minimizeButton.MouseButton1Click:Connect(toggleMinimize)
+	--// Outlines:
+	Shadow = Color3.fromRGB(0, 0, 0),
+	Outline = Color3.fromRGB(40, 40, 40),
 
--- ===== Noclip =====
-function noclip(state)
-    NoclipEnabled = state
-    local character = LocalPlayer.Character
-    if not character then return end
-    if state and not NoclipConnection then
-        NoclipConnection = RunService.Stepped:Connect(function()
-            for _, part in ipairs(character:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end)
-    elseif not state and NoclipConnection then
-        NoclipConnection:Disconnect()
-        NoclipConnection = nil
-        for _, part in ipairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end
+	--// Image:
+	Icon = Color3.fromRGB(220, 220, 220),
+}
+
+--// Services & Functions
+local Type, Blur = nil
+local LocalPlayer = GetService(game, "Players").LocalPlayer;
+local Services = {
+	Insert = GetService(game, "InsertService");
+	Tween = GetService(game, "TweenService");
+	Run = GetService(game, "RunService");
+	Input = GetService(game, "UserInputService");
+}
+
+local Player = {
+	Mouse = LocalPlayer:GetMouse();
+	GUI = LocalPlayer.PlayerGui;
+}
+
+local Tween = function(Object : Instance, Speed : number, Properties : {},  Info : { EasingStyle: Enum?, EasingDirection: Enum? })
+	local Style, Direction
+
+	if Info then
+		Style, Direction = Info["EasingStyle"], Info["EasingDirection"]
+	else
+		Style, Direction = Enum.EasingStyle.Sine, Enum.EasingDirection.Out
+	end
+
+	return Services.Tween:Create(Object, TweenInfo.new(Speed, Style, Direction), Properties):Play()
 end
 
--- ===== Infinite Jump =====
-function infinityJump(state)
-    InfiniteJumpEnabled = state
-    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
-    if not humanoid then return end
-    if state and not JumpConnection then
-        JumpConnection = UserInputService.JumpRequest:Connect(function()
-            humanoid:ChangeState("Jumping")
-        end)
-    elseif not state and JumpConnection then
-        JumpConnection:Disconnect()
-        JumpConnection = nil
-    end
+local SetProperty = function(Object: Instance, Properties: {})
+	for Index, Property in next, Properties do
+		Object[Index] = (Property);
+	end
+
+	return Object
 end
 
--- ===== God Mode =====
-function godMode(state)
-    GodModeEnabled = state
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass('Humanoid')
-    if not humanoid then return end
-    if state then
-        if GodModeConnection then return end
-        GodModeConnection = {
-            RunService.Stepped:Connect(function()
-                humanoid.Health = math.huge
-            end),
-            character.ChildRemoved:Connect(function(child)
-                local newChild = child:Clone()
-                newChild.Parent = character
-                newChild.CFrame = child.CFrame
-                child:Destroy()
-            end)
-        }
-    elseif not state and GodModeConnection then
-        for _, conn in ipairs(GodModeConnection) do
-            conn:Disconnect()
-        end
-        GodModeConnection = nil
-        humanoid.Health = humanoid.MaxHealth
-    end
+local Multiply = function(Value, Amount)
+	local New = {
+		Value.X.Scale * Amount;
+		Value.X.Offset * Amount;
+		Value.Y.Scale * Amount;
+		Value.Y.Offset * Amount;
+	}
+
+	return UDim2.new(unpack(New))
 end
 
--- ===== Anti-Kick =====
-function antiKick(state)
-    AntiKickEnabled = state
-    local character = LocalPlayer.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid then return end
-    if state and not AntiKickConnection then
-        local previousPosition = hrp.CFrame
-        AntiKickConnection = RunService.Stepped:Connect(function()
-            local currentPosition = hrp.CFrame
-            if (currentPosition.Position - previousPosition.Position).Magnitude > 500 then
-                hrp.CFrame = previousPosition
-            end
-            previousPosition = currentPosition
-            if character.Parent ~= Workspace then
-                character.Parent = Workspace
-            end
-            if humanoid.Health < 1 then
-                humanoid.Health = 1
-            end
-        end)
-    elseif not state and AntiKickConnection then
-        AntiKickConnection:Disconnect()
-        AntiKickConnection = nil
-    end
+local Color = function(Color, Factor, Mode)
+	Mode = Mode or Setup.ThemeMode
+
+	if Mode == "Light" then
+		return Color3.fromRGB((Color.R * 255) - Factor, (Color.G * 255) - Factor, (Color.B * 255) - Factor)
+	else
+		return Color3.fromRGB((Color.R * 255) + Factor, (Color.G * 255) + Factor, (Color.B * 255) + Factor)
+	end
 end
 
--- ===== Name ESP =====
-local function createNameTag(player)
-    if NameTags[player.UserId] or player == LocalPlayer then return end
-    local character = player.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local nameTag = Instance.new("BillboardGui")
-    nameTag.Size = UDim2.new(2, 0, 1, 0)
-    nameTag.AlwaysOnTop = true
-    nameTag.StudsOffset = Vector3.new(0, 4, 0)
-    nameTag.Parent = hrp
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.TextColor3 = Color3.new(1, 1, 1)
-    textLabel.TextScaled = false
-    textLabel.TextSize = 18
-    textLabel.Font = Enum.Font.SourceSansBold
-    textLabel.Text = player.Name
-    textLabel.Parent = nameTag
-    NameTags[player.UserId] = nameTag
+local Drag = function(Canvas)
+	if Canvas then
+		local Dragging;
+		local DragInput;
+		local Start;
+		local StartPosition;
+
+		local function Update(input)
+			local delta = input.Position - Start
+			Canvas.Position = UDim2.new(StartPosition.X.Scale, StartPosition.X.Offset + delta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + delta.Y)
+		end
+
+		Connect(Canvas.InputBegan, function(Input)
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch and not Type then
+				Dragging = true
+				Start = Input.Position
+				StartPosition = Canvas.Position
+
+				Connect(Input.Changed, function()
+					if Input.UserInputState == Enum.UserInputState.End then
+						Dragging = false
+					end
+				end)
+			end
+		end)
+
+		Connect(Canvas.InputChanged, function(Input)
+			if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch and not Type then
+				DragInput = Input
+			end
+		end)
+
+		Connect(Services.Input.InputChanged, function(Input)
+			if Input == DragInput and Dragging and not Type then
+				Update(Input)
+			end
+		end)
+	end
 end
 
-function nameEsp(state)
-    NameEspEnabled = state
-    if state and not NameEspConnection then
-        for _, player in ipairs(Players:GetPlayers()) do
-            createNameTag(player)
-        end
-        NameEspConnection = Players.PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function()
-                createNameTag(player)
-            end)
-        end)
-    elseif not state and NameEspConnection then
-        NameEspConnection:Disconnect()
-        NameEspConnection = nil
-        for _, nameTag in pairs(NameTags) do
-            nameTag:Destroy()
-        end
-        NameTags = {}
-    end
+Resizing = { 
+	TopLeft = { X = Vector2.new(-1, 0),   Y = Vector2.new(0, -1)};
+	TopRight = { X = Vector2.new(1, 0),    Y = Vector2.new(0, -1)};
+	BottomLeft = { X = Vector2.new(-1, 0),   Y = Vector2.new(0, 1)};
+	BottomRight = { X = Vector2.new(1, 0),    Y = Vector2.new(0, 1)};
+}
+
+Resizeable = function(Tab, Minimum, Maximum)
+	task.spawn(function()
+		local MousePos, Size, UIPos = nil, nil, nil
+
+		if Tab and Tab:FindFirstChild("Resize") then
+			local Positions = Tab:FindFirstChild("Resize")
+
+			for Index, Types in next, Positions:GetChildren() do
+				Connect(Types.InputBegan, function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						Type = Types
+						MousePos = Vector2.new(Player.Mouse.X, Player.Mouse.Y)
+						Size = Tab.AbsoluteSize
+						UIPos = Tab.Position
+					end
+				end)
+
+				Connect(Types.InputEnded, function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+						Type = nil
+					end
+				end)
+			end
+		end
+
+		local Resize = function(Delta)
+			if Type and MousePos and Size and UIPos and Tab:FindFirstChild("Resize")[Type.Name] == Type then
+				local Mode = Resizing[Type.Name]
+				local NewSize = Vector2.new(Size.X + Delta.X * Mode.X.X, Size.Y + Delta.Y * Mode.Y.Y)
+				NewSize = Vector2.new(math.clamp(NewSize.X, Minimum.X, Maximum.X), math.clamp(NewSize.Y, Minimum.Y, Maximum.Y))
+
+				local AnchorOffset = Vector2.new(Tab.AnchorPoint.X * Size.X, Tab.AnchorPoint.Y * Size.Y)
+				local NewAnchorOffset = Vector2.new(Tab.AnchorPoint.X * NewSize.X, Tab.AnchorPoint.Y * NewSize.Y)
+				local DeltaAnchorOffset = NewAnchorOffset - AnchorOffset
+
+				Tab.Size = UDim2.new(0, NewSize.X, 0, NewSize.Y)
+
+				local NewPosition = UDim2.new(
+					UIPos.X.Scale, 
+					UIPos.X.Offset + DeltaAnchorOffset.X * Mode.X.X,
+					UIPos.Y.Scale,
+					UIPos.Y.Offset + DeltaAnchorOffset.Y * Mode.Y.Y
+				)
+				Tab.Position = NewPosition
+			end
+		end
+
+		Connect(Player.Mouse.Move, function()
+			if Type then
+				Resize(Vector2.new(Player.Mouse.X, Player.Mouse.Y) - MousePos)
+			end
+		end)
+	end)
 end
 
--- ===== Invisible =====
-function invisible(state)
-    InvisibleEnabled = state
-    local character = LocalPlayer.Character
-    if not character then return end
-    task.spawn(function()
-        if state then
-            for _, part in ipairs(character:GetChildren()) do
-                if part:IsA("BasePart") or part:IsA("MeshPart") then
-                    originalProperties[part] = {Transparency = part.Transparency, CanCollide = part.CanCollide}
-                    part.Transparency = 1
-                    part.CanCollide = false
-                end
-            end
-        else
-            for _, part in ipairs(character:GetChildren()) do
-                local original = originalProperties[part]
-                if original then
-                    part.Transparency = original.Transparency
-                    part.CanCollide = original.CanCollide
-                end
-            end
-            originalProperties = {}
-        end
-        local humanoid = character:FindFirstChildOfClass('Humanoid')
-        if humanoid then
-            humanoid.DisplayDistanceType = state and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Model
-        end
-    end)
+--// Setup [UI]
+if (identifyexecutor) then
+	Screen = Services.Insert:LoadLocalAsset("rbxassetid://18490507748");
+	Blur = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Assets/Blur.lua"))();
+else
+	Screen = (script.Parent);
+	Blur = require(script.Blur)
 end
 
--- ===== Walk Speed =====
-local function applyWalkSpeed(character, speed)
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.WalkSpeed = speed
-    end
-end
+Screen.Main.Visible = false
 
--- ===== Spy =====
-function spy(targetName)
-    if SpyConnection then
-        SpyConnection:Disconnect()
-        SpyConnection = nil
-        Workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-        SpyEnabled = false
-    end
-    if targetName and targetName ~= "" then
-        local targetPlayer = Players:FindFirstChild(targetName)
-        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            SpyEnabled = true
-            if InvisibleEnabled then
-                invisible(false)
-            end
-            local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            Workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
-            SpyConnection = RunService.RenderStepped:Connect(function()
-                local offset = CFrame.new(0, 5, 15)
-                local cameraCframe = targetHRP.CFrame * offset
-                Workspace.CurrentCamera.CFrame = cameraCframe
-            end)
-        end
-    end
-end
-
--- ===== Anti-Lag =====
-function antiLag(state)
-    AntiLagEnabled = state
-    task.spawn(function()
-        if state then
-            originalGraphics = {
-                GlobalShadows = Lighting.GlobalShadows,
-                Technology = Lighting.Technology,
-                FogEnd = Lighting.FogEnd,
-                Ambient = Lighting.Ambient,
-                OutdoorAmbient = Lighting.OutdoorAmbient,
-                Brightness = Lighting.Brightness,
-                BloomEnabled = Lighting.BloomEnabled,
-            }
-            Lighting.GlobalShadows = false
-            Lighting.Technology = Enum.Technology.Compatibility
-            Lighting.FogEnd = 100
-            Lighting.Ambient = Color3.new(0, 0, 0)
-            Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-            Lighting.Brightness = 0
-            Lighting.BloomEnabled = false
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if part:IsA("ParticleEmitter") then
-                    part.Enabled = false
-                end
-            end
-        else
-            if originalGraphics and next(originalGraphics) then
-                Lighting.GlobalShadows = originalGraphics.GlobalShadows
-                Lighting.Technology = originalGraphics.Technology
-                Lighting.FogEnd = originalGraphics.FogEnd
-                Lighting.Ambient = originalGraphics.Ambient
-                Lighting.OutdoorAmbient = originalGraphics.OutdoorAmbient
-                Lighting.Brightness = originalGraphics.Brightness
-                Lighting.BloomEnabled = originalGraphics.BloomEnabled
-            end
-            for _, part in ipairs(Workspace:GetDescendants()) do
-                if part:IsA("ParticleEmitter") then
-                    part.Enabled = true
-                end
-            end
-        end
-    end)
-end
-
--- ===== ESP Checkpoint =====
-local function isCheckpoint(part)
-    local name = part.Name:lower()
-    local keywords = {"stage", "save", "spawn", "teleport", "goal", "lobby", "checkpoint", "win", "finish"}
-    for _, keyword in ipairs(keywords) do
-        if string.find(name, keyword) then
-            return true
-        end
-    end
-    if part.Material == Enum.Material.ForceField or part.Material == Enum.Material.Neon then
-        return true
-    end
-    if part:FindFirstChild("Checkpoint") or part:FindFirstChildOfClass("Configuration") then
-        return true
-    end
-    if part.Size.Y < 2 and part.Anchored and part.CanCollide then
-        if part.Position.Y < 5 then
-            return true
-        end
-    end
-    return false
-end
-
-local function createCheckpointLabel(part)
-    if CheckpointLabels[part] or not part:IsA("BasePart") or not isCheckpoint(part) then
-        return
-    end
-    local label = Instance.new("TextLabel")
-    label.Name = "CheckpointLabel_" .. part.Name
-    label.Size = UDim2.new(0, 200, 0, 30)
-    label.BackgroundTransparency = 1
-    label.TextStrokeTransparency = 0
-    label.TextColor3 = Color3.new(0, 1, 0)
-    label.Font = Enum.Font.SourceSans
-    label.TextSize = 14
-    label.Text = string.format("%s\n(%.0f, %.0f, %.0f)",
-        part.Name, part.Position.X, part.Position.Y, part.Position.Z)
-    label.Parent = CheckpointGui
-    CheckpointLabels[part] = label
-end
-
-function espCheckpoint(state)
-    CheckpointEspEnabled = state
-    if state then
-        if CheckpointEspConnection then
-            CheckpointEspConnection:Disconnect()
-            CheckpointEspConnection = nil
-        end
-        if CheckpointAddedConnection then
-            CheckpointAddedConnection:Disconnect()
-            CheckpointAddedConnection = nil
-        end
-        if CheckpointGui and CheckpointGui.Parent then
-            CheckpointGui:Destroy()
-        end
-        CheckpointGui = Instance.new("ScreenGui")
-        CheckpointGui.Name = "CheckpointESP"
-        CheckpointGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-        for _, part in pairs(Workspace:GetDescendants()) do
-            createCheckpointLabel(part)
-        end
-        CheckpointAddedConnection = Workspace.DescendantAdded:Connect(function(part)
-            if part:IsA("BasePart") then
-                createCheckpointLabel(part)
-            end
-        end)
-        CheckpointEspConnection = RunService.RenderStepped:Connect(function()
-            for checkpoint, label in pairs(CheckpointLabels) do
-                if checkpoint and checkpoint.Parent then
-                    local vector, onScreen = Camera:WorldToScreenPoint(checkpoint.Position)
-                    if onScreen then
-                        label.Visible = true
-                        label.Position = UDim2.new(0, vector.X, 0, vector.Y)
-                    else
-                        label.Visible = false
-                    end
-                else
-                    label:Destroy()
-                    CheckpointLabels[checkpoint] = nil
-                end
-            end
-        end)
-    else
-        if CheckpointEspConnection then
-            CheckpointEspConnection:Disconnect()
-            CheckpointEspConnection = nil
-        end
-        if CheckpointAddedConnection then
-            CheckpointAddedConnection:Disconnect()
-            CheckpointAddedConnection = nil
-        end
-        for _, label in pairs(CheckpointLabels) do
-            label:Destroy()
-        end
-        CheckpointLabels = {}
-        if CheckpointGui and CheckpointGui.Parent then
-            CheckpointGui:Destroy()
-        end
-        CheckpointGui = nil
-    end
-end
-
--- ===== Unlock All =====
-function unlockAll(state)
-    UnlockAllEnabled = state
-    local character = LocalPlayer.Character
-    if not character then return end
-    if state and not UnlockAllConnection then
-        UnlockAllConnection = RunService.Stepped:Connect(function()
-            for _, item in ipairs(character:GetChildren()) do
-                if item:IsA("Tool") or item:IsA("HopperBin") then
-                    item.Grip = CFrame.new(0, 0, 0)
-                    item.GripRight = Vector3.new(1, 0, 0)
-                    item.GripUp = Vector3.new(0, 1, 0)
-                    item.GripForward = Vector3.new(0, 0, 1)
-                end
-            end
-        end)
-    elseif not state and UnlockAllConnection then
-        UnlockAllConnection:Disconnect()
-        UnlockAllConnection = nil
-    end
-end
-
--- ===== Option Creators =====
-local function createToggleOption(name, text)
-    local frame = makeUI(optionsFrame, "Frame", {
-        Size = UDim2.new(0.95, 0, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-        BackgroundTransparency = 0.2,
-        BorderSizePixel = 0
-    })
-    makeUI(frame, "UICorner", {CornerRadius = UDim.new(0, 6)})
-    makeUI(frame, "TextLabel", {
-        Text = text,
-        Font = Enum.Font.Gotham,
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 12,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0.55, 0, 1, 0),
-        Position = UDim2.new(0.03, 0, 0, 0),
-        TextXAlignment = Enum.TextXAlignment.Left
-    })
-    local toggle = makeUI(frame, "TextButton", {
-        Text = "OFF",
-        Font = Enum.Font.GothamBold,
-        TextSize = 12,
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundColor3 = Color3.fromRGB(150, 50, 50),
-        Size = UDim2.new(0.35, 0, 0.75, 0),
-        Position = UDim2.new(0.62, 0, 0.125, 0),
-        Active = true
-    })
-    makeUI(toggle, "UICorner", {CornerRadius = UDim.new(0, 6)})
-    local state = false
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.Text = state and "ON" or "OFF"
-        TweenService:Create(toggle, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            BackgroundColor3 = state and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(150, 50, 50)
-        }):Play()
-        UIState.Toggles[name] = state
-        maximizedSize = calculateMaximizedSize()
-    end)
-    UIState.Toggles[name] = state
-end
-
-local function createSlider(name, min, max, default, step)
-    step = step or 1
-    local frame = makeUI(optionsFrame, "Frame", {
-        Size = UDim2.new(0.95, 0, 0, 36),
-        BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-        BackgroundTransparency = 0.2,
-        BorderSizePixel = 0
-    })
-    makeUI(frame, "UICorner", {CornerRadius = UDim.new(0, 6)})
-    makeUI(frame, "TextLabel", {
-        Text = name,
-        Font = Enum.Font.Gotham,
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 12,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0.35, 0, 1, 0),
-        Position = UDim2.new(0.03, 0, 0, 0),
-        TextXAlignment = Enum.TextXAlignment.Left
-    })
-    local sliderFrame = makeUI(frame, "Frame", {
-        Size = UDim2.new(0.55, 0, 0.35, 0),
-        Position = UDim2.new(0.42, 0, 0.35, 0),
-        BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-        Active = true
-    })
-    makeUI(sliderFrame, "UICorner", {CornerRadius = UDim.new(0, 4)})
-    local handle = makeUI(sliderFrame, "Frame", {
-        Size = UDim2.new(0, 12, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(50, 150, 50),
-        Active = true
-    })
-    makeUI(handle, "UICorner", {CornerRadius = UDim.new(0, 6)})
-    local valueLabel = makeUI(frame, "TextLabel", {
-        Text = tostring(default),
-        Font = Enum.Font.GothamBold,
-        TextColor3 = Color3.fromRGB(200, 200, 200),
-        TextSize = 12,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0.15, 0, 1, 0),
-        Position = UDim2.new(0.88, 0, 0, 0)
-    })
-    local rel = (default - min) / (max - min)
-    handle.Position = UDim2.new(rel, 0, 0, 0)
-
-    local function updateSlider(value)
-        rel = (value - min) / (max - min)
-        handle.Position = UDim2.new(rel, 0, 0, 0)
-        valueLabel.Text = tostring(math.floor(value * 10) / 10)
-    end
-
-    local function valueToColor(value)
-        local green = (value - min) / (max - min) * 255
-        return Color3.fromRGB(0, green, 0)
-    end
-
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local function update(value)
-                local clamped = math.clamp(value, min, max)
-                updateSlider(clamped)
-                UIState.Sliders[name] = clamped
-            end
-            local function onSlide(input)
-                local pos = UDim2.new(0, input.Position.X - sliderFrame.AbsolutePosition.X, 0, 0)
-                local value = pos.X / sliderFrame.AbsoluteSize.X * (max - min) + min
-                update(value)
-            end
-            local connection
-            connection = UserInputService.InputChanged:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseMovement then
-                    onSlide(input)
-                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    if input.UserInputState == Enum.UserInputState.End then
-                        connection:Disconnect()
-                    end
-                end
-            end)
-            onSlide(input)
-        end
-    end)
-
-    UIState.Sliders[name] = default
-    maximizedSize = calculateMaximizedSize()
-end
-
--- ===== Character Listener =====
-LocalPlayer.CharacterAdded:Connect(function(character)
-    applyWalkSpeed(character, currentWalkSpeed)
-    if NoclipEnabled then noclip(true) end
-    if InfiniteJumpEnabled then infinityJump(true) end
-    if GodModeEnabled then godMode(true) end
-    if AntiKickEnabled then antiKick(true) end
-    if NameEspEnabled then nameEsp(true) end
-    if InvisibleEnabled then invisible(true) end
-    if AntiLagEnabled then antiLag(true) end
-    if CheckpointEspEnabled then espCheckpoint(true) end
-    if UnlockAllEnabled then unlockAll(true) end
+xpcall(function()
+	Screen.Parent = game.CoreGui
+end, function() 
+	Screen.Parent = Player.GUI
 end)
 
--- ===== Character Removing Listener =====
-LocalPlayer.CharacterRemoving:Connect(function(character)
-    if NoclipEnabled then noclip(false) end
-    if InfiniteJumpEnabled then infinityJump(false) end
-    if GodModeEnabled then godMode(false) end
-    if AntiKickEnabled then antiKick(false) end
-    if InvisibleEnabled then invisible(false) end
-end)
+--// Tables for Data
+local Animations = {}
+local Blurs = {}
+local Components = (Screen:FindFirstChild("Components"));
+local Library = {};
+local StoredInfo = {
+	["Sections"] = {};
+	["Tabs"] = {}
+};
 
--- ===== UI Initialization =====
-task.spawn(function()
-    createToggleOption("Noclip", "Noclip")
-    createToggleOption("Infinite Jump", "Infinite Jump")
-    createToggleOption("God Mode", "God Mode")
-    createToggleOption("Anti Kick", "Anti Kick")
-    createToggleOption("Name ESP", "Name ESP")
-    createToggleOption("Invisible", "Invisible")
-    createToggleOption("Anti-Lag", "Anti-Lag")
-    createToggleOption("Checkpoint ESP", "Checkpoint ESP")
-    createToggleOption("Unlock All", "Unlock All")
-    createSlider("WalkSpeed", 16, 100, 16, 1)
-end)
+--// Animations [Window]
+function Animations:Open(Window: CanvasGroup, Transparency: number, UseCurrentSize: boolean)
+	local Original = (UseCurrentSize and Window.Size) or Setup.Size
+	local Multiplied = Multiply(Original, 1.1)
+	local Shadow = Window:FindFirstChildOfClass("UIStroke")
+
+
+	SetProperty(Shadow, { Transparency = 1 })
+	SetProperty(Window, {
+		Size = Multiplied,
+		GroupTransparency = 1,
+		Visible = true,
+	})
+
+	Tween(Shadow, .25, { Transparency = 0.5 })
+	Tween(Window, .25, {
+		Size = Original,
+		GroupTransparency = Transparency or 0,
+	})
+end
+
+function Animations:Close(Window: CanvasGroup)
+	local Original = Window.Size
+	local Multiplied = Multiply(Original, 1.1)
+	local Shadow = Window:FindFirstChildOfClass("UIStroke")
+
+	SetProperty(Window, {
+		Size = Original,
+	})
+
+	Tween(Shadow, .25, { Transparency = 1 })
+	Tween(Window, .25, {
+		Size = Multiplied,
+		GroupTransparency = 1,
+	})
+
+	task.wait(.25)
+	Window.Size = Original
+	Window.Visible = false
+end
+
+
+function Animations:Component(Component: any, Custom: boolean)	
+	Connect(Component.InputBegan, function() 
+		if Custom then
+			Tween(Component, .25, { Transparency = .85 });
+		else
+			Tween(Component, .25, { BackgroundColor3 = Color(Theme.Component, 5, Setup.ThemeMode) });
+		end
+	end)
+
+	Connect(Component.InputEnded, function() 
+		if Custom then
+			Tween(Component, .25, { Transparency = 1 });
+		else
+			Tween(Component, .25, { BackgroundColor3 = Theme.Component });
+		end
+	end)
+end
+
+--// Library [Window]
+
+function Library:CreateWindow(Settings: { Title: string, Size: UDim2, Transparency: number, MinimizeKeybind: Enum.KeyCode?, Blurring: boolean, Theme: string })
+	local Window = Clone(Screen:WaitForChild("Main"));
+	local Sidebar = Window:FindFirstChild("Sidebar");
+	local Holder = Window:FindFirstChild("Main");
+	local BG = Window:FindFirstChild("BackgroundShadow");
+	local Tab = Sidebar:FindFirstChild("Tab");
+
+	local Options = {};
+	local Examples = {};
+	local Opened = true;
+	local Maximized = false;
+	local Minimized = false;
+	local BlurEnabled = false
+
+	for Index, Example in next, Window:GetDescendants() do
+		if Example.Name:find("Example") and not Examples[Example.Name] then
+			Examples[Example.Name] = Example
+		end
+	end
+
+	--// UI Blur & More
+	Drag(Window);
+	Resizeable(Window, Vector2.new(411, 271), Vector2.new(9e9, 9e9));
+	Setup.Transparency = Settings.Transparency or 0
+	Setup.Size = Settings.Size
+	Setup.ThemeMode = Settings.Theme or "Dark"
+
+	if Settings.Blurring then
+		Blurs[Settings.Title] = Blur.new(Window, 5)
+		BlurEnabled = true
+	end
+
+	if Settings.MinimizeKeybind then
+		Setup.Keybind = Settings.MinimizeKeybind
+	end
+
+	--// Mini Title Bar for Minimize
+	local MiniBar = nil
+	local function CreateMiniBar()
+		if MiniBar then return end
+
+		MiniBar = Instance.new("Frame")
+		MiniBar.Name = "MiniTitleBar"
+		MiniBar.Size = UDim2.new(0, 220, 0, 32)
+		MiniBar.Position = UDim2.new(0.5, -110, 1, -40) -- di bawah layar agak ke atas
+		MiniBar.BackgroundColor3 = Theme.Secondary
+		MiniBar.BorderSizePixel = 0
+		MiniBar.Parent = Screen
+		MiniBar.Visible = false
+
+		local title = Instance.new("TextLabel", MiniBar)
+		title.Size = UDim2.new(1, -60, 1, 0)
+		title.Position = UDim2.new(0, 8, 0, 0)
+		title.BackgroundTransparency = 1
+		title.TextColor3 = Theme.Title
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.Font = Enum.Font.SourceSansBold
+		title.TextSize = 14
+		title.Text = Settings.Title or "Window"
+
+		local restoreBtn = Instance.new("TextButton", MiniBar)
+		restoreBtn.Name = "Restore"
+		restoreBtn.Size = UDim2.new(0, 24, 0, 24)
+		restoreBtn.Position = UDim2.new(1, -32, 0.5, -12)
+		restoreBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
+		restoreBtn.Text = "□"
+		restoreBtn.TextColor3 = Color3.new(1,1,1)
+		restoreBtn.Font = Enum.Font.SourceSansBold
+
+		restoreBtn.MouseButton1Click:Connect(function()
+			Minimized = false
+			MiniBar.Visible = false
+			Window.Visible = true
+			Animations:Open(Window, Setup.Transparency)
+			if BlurEnabled then
+				Blurs[Settings.Title].root.Parent = workspace.CurrentCamera
+			end
+		end)
+
+		Drag(MiniBar) -- biar bisa digeser
+	end
+
+	--// Animate
+	local Close = function()
+		if Opened then
+			if BlurEnabled then
+				Blurs[Settings.Title].root.Parent = nil
+			end
+
+			Opened = false
+			Animations:Close(Window)
+			Window.Visible = false
+		else
+			Animations:Open(Window, Setup.Transparency)
+			Opened = true
+
+			if BlurEnabled then
+				Blurs[Settings.Title].root.Parent = workspace.CurrentCamera
+			end
+		end
+	end
+
+	for Index, Button in next, Sidebar.Top.Buttons:GetChildren() do
+		if Button:IsA("TextButton") then
+			local Name = Button.Name
+			Animations:Component(Button, true)
+
+			Connect(Button.MouseButton1Click, function() 
+				if Name == "Close" then
+					Close()
+				elseif Name == "Maximize" then
+					if Maximized then
+						-- Restore ke ukuran & posisi semula
+						Maximized = false
+						Tween(Window, 0.2, { 
+							Size     = Window:GetAttribute("LastSize") or Setup.Size,
+							Position = Window:GetAttribute("LastPosition") or UDim2.new(0.5, 0, 0.5, 0),
+							AnchorPoint = Window:GetAttribute("LastAnchor") or Vector2.new(0.5, 0.5)
+						})
+					else
+						-- Maximize
+						Maximized = true
+
+						-- Simpan ukuran & posisi sebelum maximize
+						Window:SetAttribute("LastSize", Window.Size)
+						Window:SetAttribute("LastPosition", Window.Position)
+						Window:SetAttribute("LastAnchor", Window.AnchorPoint)
+
+						Tween(Window, 0.2, { 
+							Size       = UDim2.fromScale(1, 1),
+							Position   = UDim2.fromScale(0.5, 0.5),
+							AnchorPoint = Vector2.new(0.5, 0.5)
+						})
+					end
+				elseif Name == "Minimize" then
+					if not Minimized then
+						Minimized = true
+						CreateMiniBar()
+						MiniBar.Visible = true
+
+						Animations:Close(Window)
+						task.delay(0.3, function()
+							Window.Visible = false
+							if BlurEnabled then
+								Blurs[Settings.Title].root.Parent = nil
+							end
+						end)
+					end
+				end
+			end)
+		end
+	end
+
+	Services.Input.InputBegan:Connect(function(Input, Focused) 
+		if (Input == Setup.Keybind or Input.KeyCode == Setup.Keybind) and not Focused then
+			Close()
+		end
+	end)
+
+	--// Tab Functions
+
+	function Options:SetTab(Name: string)
+		for Index, Button in next, Tab:GetChildren() do
+			if Button:IsA("TextButton") then
+				local Opened, SameName = Button.Value, (Button.Name == Name);
+				local Padding = Button:FindFirstChildOfClass("UIPadding");
+
+				if SameName and not Opened.Value then
+					Tween(Padding, .25, { PaddingLeft = UDim.new(0, 25) });
+					Tween(Button, .25, { BackgroundTransparency = 0.9, Size = UDim2.new(1, -15, 0, 30) });
+					SetProperty(Opened, { Value = true });
+				elseif not SameName and Opened.Value then
+					Tween(Padding, .25, { PaddingLeft = UDim.new(0, 20) });
+					Tween(Button, .25, { BackgroundTransparency = 1, Size = UDim2.new(1, -44, 0, 30) });
+					SetProperty(Opened, { Value = false });
+				end
+			end
+		end
+
+		for Index, Main in next, Holder:GetChildren() do
+			if Main:IsA("CanvasGroup") then
+				local Opened, SameName = Main.Value, (Main.Name == Name);
+				local Scroll = Main:FindFirstChild("ScrollingFrame");
+
+				if SameName and not Opened.Value then
+					Opened.Value = true
+					Main.Visible = true
+
+					Tween(Main, .3, { GroupTransparency = 0 });
+					Tween(Scroll["UIPadding"], .3, { PaddingTop = UDim.new(0, 5) });
+
+				elseif not SameName and Opened.Value then
+					Opened.Value = false
+
+					Tween(Main, .15, { GroupTransparency = 1 });
+					Tween(Scroll["UIPadding"], .15, { PaddingTop = UDim.new(0, 15) });	
+
+					task.delay(.2, function()
+						Main.Visible = false
+					end)
+				end
+			end
+		end
+	end
+
+	function Options:AddTabSection(Settings: { Name: string, Order: number })
+		local Example = Examples["SectionExample"];
+		local Section = Clone(Example);
+
+		StoredInfo["Sections"][Settings.Name] = (Settings.Order);
+		SetProperty(Section, { 
+			Parent = Example.Parent,
+			Text = Settings.Name,
+			Name = Settings.Name,
+			LayoutOrder = Settings.Order,
+			Visible = true
+		});
+	end
+
+	function Options:AddTab(Settings: { Title: string, Icon: string, Section: string? })
+		if StoredInfo["Tabs"][Settings.Title] then 
+			error("[UI LIB]: A tab with the same name has already been created") 
+		end 
+
+		local Example, MainExample = Examples["TabButtonExample"], Examples["MainExample"];
+		local Section = StoredInfo["Sections"][Settings.Section];
+		local Main = Clone(MainExample);
+		local Tab = Clone(Example);
+
+		if not Settings.Icon then
+			Destroy(Tab["ICO"]);
+		else
+			SetProperty(Tab["ICO"], { Image = Settings.Icon });
+		end
+
+		StoredInfo["Tabs"][Settings.Title] = { Tab }
+		SetProperty(Tab["TextLabel"], { Text = Settings.Title });
+
+		SetProperty(Main, { 
+			Parent = MainExample.Parent,
+			Name = Settings.Title;
+		});
+
+		SetProperty(Tab, { 
+			Parent = Example.Parent,
+			LayoutOrder = Section or #StoredInfo["Sections"] + 1,
+			Name = Settings.Title;
+			Visible = true;
+		});
+
+		Tab.MouseButton1Click:Connect(function()
+			Options:SetTab(Tab.Name);
+		end)
+
+		return Main.ScrollingFrame
+	end
+	
+	--// Notifications
+	
+	function Options:Notify(Settings: { Title: string, Description: string, Duration: number }) 
+		local Notification = Clone(Components["Notification"]);
+		local Title, Description = Options:GetLabels(Notification);
+		local Timer = Notification["Timer"];
+		
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Notification, {
+			Parent = Screen["Frame"],
+		})
+		
+		task.spawn(function() 
+			local Duration = Settings.Duration or 2
+			local Wait = task.wait;
+			
+			Animations:Open(Notification, Setup.Transparency, true); Tween(Timer, Duration, { Size = UDim2.new(0, 0, 0, 4) });
+			Wait(Duration);
+			Animations:Close(Notification);
+			Wait(1);
+			Notification:Destroy();
+		end)
+	end
+
+	--// Component Functions
+
+	function Options:GetLabels(Component)
+		local Labels = Component:FindFirstChild("Labels")
+
+		return Labels.Title, Labels.Description
+	end
+
+	function Options:AddSection(Settings: { Name: string, Tab: Instance }) 
+		local Section = Clone(Components["Section"]);
+		SetProperty(Section, {
+			Text = Settings.Name,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+	
+	function Options:AddButton(Settings: { Title: string, Description: string, Tab: Instance, Callback: any }) 
+		local Button = Clone(Components["Button"]);
+		local Title, Description = Options:GetLabels(Button);
+
+		Connect(Button.MouseButton1Click, Settings.Callback)
+		Animations:Component(Button)
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Button, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	function Options:AddInput(Settings: { Title: string, Description: string, Tab: Instance, Callback: any }) 
+		local Input = Clone(Components["Input"]);
+		local Title, Description = Options:GetLabels(Input);
+		local TextBox = Input["Main"]["Input"];
+
+		Connect(Input.MouseButton1Click, function() 
+			TextBox:CaptureFocus()
+		end)
+
+		Connect(TextBox.FocusLost, function() 
+			Settings.Callback(TextBox.Text)
+		end)
+
+		Animations:Component(Input)
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Input, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Tab: Instance, Callback: any }) 
+		local Toggle = Clone(Components["Toggle"]);
+		local Title, Description = Options:GetLabels(Toggle);
+
+		local On = Toggle["Value"];
+		local Main = Toggle["Main"];
+		local Circle = Main["Circle"];
+		
+		local Set = function(Value)
+			if Value then
+				Tween(Main,   .2, { BackgroundColor3 = Color3.fromRGB(153, 155, 255) });
+				Tween(Circle, .2, { BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.new(1, -16, 0.5, 0) });
+			else
+				Tween(Main,   .2, { BackgroundColor3 = Theme.Interactables });
+				Tween(Circle, .2, { BackgroundColor3 = Theme.Primary, Position = UDim2.new(0, 3, 0.5, 0) });
+			end
+			
+			On.Value = Value
+		end 
+
+		Connect(Toggle.MouseButton1Click, function()
+			local Value = not On.Value
+
+			Set(Value)
+			Settings.Callback(Value)
+		end)
+
+		Animations:Component(Toggle);
+		Set(Settings.Default);
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Toggle, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+	
+	function Options:AddKeybind(Settings: { Title: string, Description: string, Tab: Instance, Callback: any }) 
+		local Dropdown = Clone(Components["Keybind"]);
+		local Title, Description = Options:GetLabels(Dropdown);
+		local Bind = Dropdown["Main"].Options;
+		
+		local Mouse = { Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2, Enum.UserInputType.MouseButton3 }; 
+		local Types = { 
+			["Mouse"] = "Enum.UserInputType.MouseButton", 
+			["Key"] = "Enum.KeyCode." 
+		}
+		
+		Connect(Dropdown.MouseButton1Click, function()
+			local Time = tick();
+			local Detect, Finished
+			
+			SetProperty(Bind, { Text = "..." });
+			Detect = Connect(game.UserInputService.InputBegan, function(Key, Focused) 
+				local InputType = (Key.UserInputType);
+				
+				if not Finished and not Focused then
+					Finished = (true)
+					
+					if table.find(Mouse, InputType) then
+						Settings.Callback(Key);
+						SetProperty(Bind, {
+							Text = tostring(InputType):gsub(Types.Mouse, "MB")
+						})
+					elseif InputType == Enum.UserInputType.Keyboard then
+						Settings.Callback(Key);
+						SetProperty(Bind, {
+							Text = tostring(Key.KeyCode):gsub(Types.Key, "")
+						})
+					end
+				end 
+			end)
+		end)
+
+		Animations:Component(Dropdown);
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Dropdown, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	function Options:AddDropdown(Settings: { Title: string, Description: string, Options: {}, Tab: Instance, Callback: any }) 
+		local Dropdown = Clone(Components["Dropdown"]);
+		local Title, Description = Options:GetLabels(Dropdown);
+		local Text = Dropdown["Main"].Options;
+
+		Connect(Dropdown.MouseButton1Click, function()
+			local Example = Clone(Examples["DropdownExample"]);
+			local Buttons = Example["Top"]["Buttons"];
+
+			Tween(BG, .25, { BackgroundTransparency = 0.6 });
+			SetProperty(Example, { Parent = Window });
+			Animations:Open(Example, 0, true)
+
+			for Index, Button in next, Buttons:GetChildren() do
+				if Button:IsA("TextButton") then
+					Animations:Component(Button, true)
+
+					Connect(Button.MouseButton1Click, function()
+						Tween(BG, .25, { BackgroundTransparency = 1 });
+						Animations:Close(Example);
+						task.wait(2)
+						Destroy(Example);
+					end)
+				end
+			end
+
+			for Index, Option in next, Settings.Options do
+				local Button = Clone(Examples["DropdownButtonExample"]);
+				local Title, Description = Options:GetLabels(Button);
+				local Selected = Button["Value"];
+
+				Animations:Component(Button);
+				SetProperty(Title, { Text = Index });
+				SetProperty(Button, { Parent = Example.ScrollingFrame, Visible = true });
+				Destroy(Description);
+
+				Connect(Button.MouseButton1Click, function() 
+					local NewValue = not Selected.Value 
+
+					if NewValue then
+						Tween(Button, .25, { BackgroundColor3 = Theme.Interactables });
+						Settings.Callback(Option)
+						Text.Text = Index
+
+						for _, Others in next, Example:GetChildren() do
+							if Others:IsA("TextButton") and Others \~= Button then
+								Others.BackgroundColor3 = Theme.Component
+							end
+						end
+					else
+						Tween(Button, .25, { BackgroundColor3 = Theme.Component });
+					end
+
+					Selected.Value = NewValue
+					Tween(BG, .25, { BackgroundTransparency = 1 });
+					Animations:Close(Example);
+					task.wait(2)
+					Destroy(Example);
+				end)
+			end
+		end)
+
+		Animations:Component(Dropdown);
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Dropdown, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	function Options:AddSlider(Settings: { Title: string, Description: string, MaxValue: number, AllowDecimals: boolean, DecimalAmount: number, Tab: Instance, Callback: any }) 
+		local Slider = Clone(Components["Slider"]);
+		local Title, Description = Options:GetLabels(Slider);
+
+		local Main = Slider["Slider"];
+		local Amount = Main["Main"].Input;
+		local Slide = Main["Slide"];
+		local Fire = Slide["Fire"];
+		local Fill = Slide["Highlight"];
+		local Circle = Fill["Circle"];
+
+		local Active = false
+		local Value = 0
+		
+		local SetNumber = function(Number)
+			if Settings.AllowDecimals then
+				local Power = 10 ^ (Settings.DecimalAmount or 2)
+				Number = math.floor(Number * Power + 0.5) / Power
+			else
+				Number = math.round(Number)
+			end
+			
+			return Number
+		end
+
+		local Update = function(Number)
+			local Scale = (Player.Mouse.X - Slide.AbsolutePosition.X) / Slide.AbsoluteSize.X			
+			Scale = (Scale > 1 and 1) or (Scale < 0 and 0) or Scale
+			
+			if Number then
+				Number = (Number > Settings.MaxValue and Settings.MaxValue) or (Number < 0 and 0) or Number
+			end
+			
+			Value = SetNumber(Number or (Scale * Settings.MaxValue))
+			Amount.Text = Value
+			Fill.Size = UDim2.fromScale((Number and Number / Settings.MaxValue) or Scale, 1)
+			Settings.Callback(Value)
+		end
+
+		local Activate = function()
+			Active = true
+
+			repeat task.wait()
+				Update()
+			until not Active
+		end
+		
+		Connect(Amount.FocusLost, function() 
+			Update(tonumber(Amount.Text) or 0)
+		end)
+
+		Connect(Fire.MouseButton1Down, Activate)
+		Connect(Services.Input.InputEnded, function(Input) 
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+				Active = false
+			end
+		end)
+
+		Fill.Size = UDim2.fromScale(Value, 1);
+		Animations:Component(Slider);
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Slider, {
+			Name = Settings.Title,
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	function Options:AddParagraph(Settings: { Title: string, Description: string, Tab: Instance }) 
+		local Paragraph = Clone(Components["Paragraph"]);
+		local Title, Description = Options:GetLabels(Paragraph);
+
+		SetProperty(Title, { Text = Settings.Title });
+		SetProperty(Description, { Text = Settings.Description });
+		SetProperty(Paragraph, {
+			Parent = Settings.Tab,
+			Visible = true,
+		})
+	end
+
+	local Themes = {
+		Names = {	
+			["Paragraph"] = function(Label)
+				if Label:IsA("TextButton") then
+					Label.BackgroundColor3 = Color(Theme.Component, 5, "Dark");
+				end
+			end,
+			
+			["Title"] = function(Label)
+				if Label:IsA("TextLabel") then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+
+			["Description"] = function(Label)
+				if Label:IsA("TextLabel") then
+					Label.TextColor3 = Theme.Description
+				end
+			end,
+			
+			["Section"] = function(Label)
+				if Label:IsA("TextLabel") then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+
+			["Options"] = function(Label)
+				if Label:IsA("TextLabel") and Label.Parent.Name == "Main" then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+			
+			["Notification"] = function(Label)
+				if Label:IsA("CanvasGroup") then
+					Label.BackgroundColor3 = Theme.Primary
+					Label.UIStroke.Color = Theme.Outline
+				end
+			end,
+
+			["TextLabel"] = function(Label)
+				if Label:IsA("TextLabel") and Label.Parent:FindFirstChild("List") then
+					Label.TextColor3 = Theme.Tab
+				end
+			end,
+
+			["Main"] = function(Label)
+				if Label:IsA("Frame") then
+
+					if Label.Parent == Window then
+						Label.BackgroundColor3 = Theme.Secondary
+					elseif Label.Parent:FindFirstChild("Value") then
+						local Toggle = Label.Parent.Value 
+						local Circle = Label:FindFirstChild("Circle")
+						
+						if not Toggle.Value then
+							Label.BackgroundColor3 = Theme.Interactables
+							Label.Circle.BackgroundColor3 = Theme.Primary
+						end
+					else
+						Label.BackgroundColor3 = Theme.Interactables
+					end
+				elseif Label:FindFirstChild("Padding") then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+
+			["Amount"] = function(Label)
+				if Label:IsA("Frame") then
+					Label.BackgroundColor3 = Theme.Interactables
+				end
+			end,
+
+			["Slide"] = function(Label)
+				if Label:IsA("Frame") then
+					Label.BackgroundColor3 = Theme.Interactables
+				end
+			end,
+
+			["Input"] = function(Label)
+				if Label:IsA("TextLabel") then
+					Label.TextColor3 = Theme.Title
+				elseif Label:FindFirstChild("Labels") then
+					Label.BackgroundColor3 = Theme.Component
+				elseif Label:IsA("TextBox") and Label.Parent.Name == "Main" then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+
+			["Outline"] = function(Stroke)
+				if Stroke:IsA("UIStroke") then
+					Stroke.Color = Theme.Outline
+				end
+			end,
+
+			["DropdownExample"] = function(Label)
+				Label.BackgroundColor3 = Theme.Secondary
+			end,
+
+			["Underline"] = function(Label)
+				if Label:IsA("Frame") then
+					Label.BackgroundColor3 = Theme.Outline
+				end
+			end,
+		},
+
+		Classes = {
+			["ImageLabel"] = function(Label)
+				if Label.Image \~= "rbxassetid://6644618143" then
+					Label.ImageColor3 = Theme.Icon
+				end
+			end,
+
+			["TextLabel"] = function(Label)
+				if Label:FindFirstChild("Padding") then
+					Label.TextColor3 = Theme.Title
+				end
+			end,
+
+			["TextButton"] = function(Label)
+				if Label:FindFirstChild("Labels") then
+					Label.BackgroundColor3 = Theme.Component
+				end
+			end,
+
+			["ScrollingFrame"] = function(Label)
+				Label.ScrollBarImageColor3 = Theme.Component
+			end,
+		},
+	}
+
+	function Options:SetTheme(Info)
+		Theme = Info or Theme
+
+		Window.BackgroundColor3 = Theme.Primary
+		Holder.BackgroundColor3 = Theme.Secondary
+		Window.UIStroke.Color = Theme.Shadow
+
+		for Index, Descendant in next, Screen:GetDescendants() do
+			local Name, Class =  Themes.Names[Descendant.Name],  Themes.Classes[Descendant.ClassName]
+
+			if Name then
+				Name(Descendant);
+			elseif Class then
+				Class(Descendant);
+			end
+		end
+	end
+
+	--// Changing Settings
+
+	function Options:SetSetting(Setting, Value) --// Available settings - Size, Transparency, Blur, Theme
+		if Setting == "Size" then
+			
+			Window.Size = Value
+			Setup.Size = Value
+			
+		elseif Setting == "Transparency" then
+			
+			Window.GroupTransparency = Value
+			Setup.Transparency = Value
+			
+			for Index, Notification in next, Screen:GetDescendants() do
+				if Notification:IsA("CanvasGroup") and Notification.Name == "Notification" then
+					Notification.GroupTransparency = Value
+				end
+			end
+			
+		elseif Setting == "Blur" then
+			
+			local AlreadyBlurred, Root = Blurs[Settings.Title], nil
+			
+			if AlreadyBlurred then
+				Root = Blurs[Settings.Title]["root"]
+			end
+			
+			if Value then
+				BlurEnabled = true
+
+				if not AlreadyBlurred or not Root then
+					Blurs[Settings.Title] = Blur.new(Window, 5)
+				elseif Root and not Root.Parent then
+					Root.Parent = workspace.CurrentCamera
+				end
+			elseif not Value and (AlreadyBlurred and Root and Root.Parent) then
+				Root.Parent = nil
+				BlurEnabled = false
+			end
+			
+		elseif Setting == "Theme" and typeof(Value) == "table" then
+			
+			Options:SetTheme(Value)
+			
+		elseif Setting == "Keybind" then
+			
+			Setup.Keybind = Value
+			
+		else
+			warn("Tried to change a setting that doesn't exist or isn't available to change.")
+		end
+	end
+
+	SetProperty(Window, { Size = Settings.Size, Visible = true, Parent = Screen });
+	-- Animations:Open(Window, Settings.Transparency or 0) -- Dihapus agar tidak terbuka otomatis
+
+	-- Inisialisasi dalam keadaan minimize
+	Minimized = true
+	CreateMiniBar()
+	MiniBar.Visible = true
+	Window.Visible = false
+	if BlurEnabled then
+		Blurs[Settings.Title].root.Parent = nil
+	end
+
+	return Options
+end
+
+return Library
