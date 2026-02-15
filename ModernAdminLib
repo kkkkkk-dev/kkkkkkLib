@@ -1,0 +1,353 @@
+-- ModernAdminLib (ModuleScript)
+-- Complex Admin UI Library with Lucide Icons support
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+
+local ModernAdminLib = {}
+ModernAdminLib.__index = ModernAdminLib
+
+-- Lucide Spritesheet (ganti ID ini dengan spritesheet aktif dari Toolbox)
+-- Cari "Lucide Roblox Spritesheet" di Toolbox, ambil ID terbaru (contoh dari latte-soft bundle)
+local LUCIDE_SHEET_ID = "rbxassetid://15269177520"  -- UPDATE INI DENGAN ID AKTIF !
+
+-- Ukuran tiap icon di spritesheet (biasanya 48x48 atau 24x24, sesuaikan)
+local ICON_SIZE = Vector2.new(48, 48)
+
+-- Mapping nama icon Lucide ke offset di spritesheet (contoh sederhana, tambah sendiri)
+-- Kamu perlu ambil offset sebenarnya dari doc bundle atau tool picker
+local iconOffsets = {
+    home     = Vector2.new(0, 0),
+    users    = Vector2.new(48, 0),
+    globe    = Vector2.new(96, 0),
+    package  = Vector2.new(144, 0),
+    settings = Vector2.new(192, 0),
+    search   = Vector2.new(240, 0),
+    -- Tambah lebih banyak sesuai sheet-mu
+    -- Contoh: zap = Vector2.new(288, 0), dll
+}
+
+-- Helper create instance
+local function create(class, props, parent)
+    local obj = Instance.new(class)
+    for k, v in pairs(props or {}) do obj[k] = v end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+function ModernAdminLib.new()
+    local self = setmetatable({}, ModernAdminLib)
+    
+    self.IsMinimized = true
+    self.ActiveTab = "Home"
+    self.Tabs = {}
+    self.Options = {}  -- untuk simpan state toggle/slider dll
+    
+    self:BuildUI()
+    
+    return self
+end
+
+function ModernAdminLib:BuildUI()
+    -- Blur
+    self.Blur = create("BlurEffect", {Size = 14, Enabled = false}, Lighting)
+    
+    -- ScreenGui
+    self.Gui = create("ScreenGui", {
+        Name = "ModernAdminUI",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true
+    }, LocalPlayer:WaitForChild("PlayerGui"))
+    
+    -- Main Frame
+    self.MainFrame = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0.15, 0),
+        Size = UDim2.new(0, 220, 0, 38),
+        BackgroundColor3 = Color3.fromRGB(32, 32, 32),
+        BackgroundTransparency = 0.45,
+        ClipsDescendants = true,
+        Active = true
+    }, self.Gui)
+    create("UICorner", {CornerRadius = UDim.new(0, 10)}, self.MainFrame)
+    
+    -- Shadow & Stroke (sama seperti sebelumnya)
+    create("ImageLabel", {
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://5028857084",
+        ImageTransparency = 0.85,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(24,24,276,276),
+        Size = UDim2.new(1, 20, 1, 20),
+        Position = UDim2.new(0, -10, 0, -10),
+        ZIndex = -2
+    }, self.MainFrame)
+    
+    create("UIStroke", {
+        Color = Color3.fromRGB(90, 90, 90),
+        Thickness = 1.1,
+        Transparency = 0.45
+    }, self.MainFrame)
+    
+    -- Title minimized
+    self.TitleLabel = create("TextLabel", {
+        Text = "Admin",
+        Font = Enum.Font.GothamSemibold,
+        TextColor3 = Color3.fromRGB(225,225,225),
+        TextSize = 13,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, -70, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Visible = true
+    }, self.MainFrame)
+    
+    -- Minimize Button
+    self.MinimizeBtn = create("TextButton", {
+        Text = "+",
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        TextColor3 = Color3.fromRGB(225,225,225),
+        BackgroundColor3 = Color3.fromRGB(55,55,55),
+        Size = UDim2.new(0, 28, 0, 28),
+        Position = UDim2.new(1, -8, 0, 5),
+        AnchorPoint = Vector2.new(1, 0),
+        ZIndex = 10
+    }, self.MainFrame)
+    create("UICorner", {CornerRadius = UDim.new(1,0)}, self.MinimizeBtn)
+    
+    self.MinimizeBtn.MouseButton1Click:Connect(function()
+        self:ToggleMinimize()
+    end)
+    
+    -- Sidebar
+    self.Sidebar = create("Frame", {
+        Size = UDim2.new(0, 54, 1, -10),
+        Position = UDim2.new(0, 5, 0, 5),
+        BackgroundColor3 = Color3.fromRGB(26,26,26),
+        BorderSizePixel = 0,
+        Visible = false
+    }, self.MainFrame)
+    create("UICorner", {CornerRadius = UDim.new(0,8)}, self.Sidebar)
+    
+    local sidebarList = create("UIListLayout", {
+        Padding = UDim.new(0,6),
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Top
+    }, self.Sidebar)
+    create("UIPadding", {PaddingTop = UDim.new(0,8), PaddingBottom = UDim.new(0,8)}, self.Sidebar)
+    
+    -- Content ScrollingFrame
+    self.Content = create("ScrollingFrame", {
+        Size = UDim2.new(1, -64, 1, -10),
+        Position = UDim2.new(0, 60, 0, 5),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 4,
+        CanvasSize = UDim2.new(0,0,0,0),
+        Visible = false,
+        ScrollingDirection = Enum.ScrollingDirection.Y
+    }, self.MainFrame)
+    
+    local contentList = create("UIListLayout", {
+        Padding = UDim.new(0,8),
+        FillDirection = Enum.FillDirection.Vertical,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center
+    }, self.Content)
+    
+    contentList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        self.Content.CanvasSize = UDim2.new(0, 0, 0, contentList.AbsoluteContentSize.Y + 20)
+    end)
+    
+    -- Tab system
+    self.TabContainers = {}
+    
+    self:BuildTabs()
+    
+    -- Dragging logic
+    self:SetupDragging()
+end
+
+function ModernAdminLib:BuildTabs()
+    local tabList = {
+        {Name = "Home", Icon = "home"},
+        {Name = "Players", Icon = "users"},
+        {Name = "World", Icon = "globe"},
+        {Name = "Items", Icon = "package"},
+        {Name = "Settings", Icon = "settings"},
+    }
+    
+    for _, tabData in ipairs(tabList) do
+        local offset = iconOffsets[tabData.Icon] or Vector2.new(0, 0)
+        
+        local btn = create("ImageButton", {
+            Size = UDim2.new(0,38,0,38),
+            BackgroundColor3 = Color3.fromRGB(45,45,45),
+            Image = LUCIDE_SHEET_ID,
+            ImageRectSize = ICON_SIZE,
+            ImageRectOffset = offset,
+            ImageColor3 = Color3.fromRGB(210,210,210),
+            BackgroundTransparency = (tabData.Name == "Home") and 0.3 or 0.55,
+            AutoButtonColor = false
+        }, self.Sidebar)
+        create("UICorner", {CornerRadius = UDim.new(0,8)}, btn)
+        
+        local indicator = create("Frame", {
+            Size = UDim2.new(0,3,0,22),
+            Position = UDim2.new(1,-5,0.5,0),
+            AnchorPoint = Vector2.new(0,0.5),
+            BackgroundColor3 = Color3.fromRGB(120,200,255),
+            BorderSizePixel = 0,
+            Visible = (tabData.Name == "Home")
+        }, btn)
+        create("UICorner", {CornerRadius = UDim.new(1,0)}, indicator)
+        
+        btn.MouseButton1Click:Connect(function()
+            self:SwitchTab(tabData.Name)
+        end)
+        
+        -- Tab container
+        local container = create("Frame", {
+            Size = UDim2.new(1, -20, 1, 0),
+            BackgroundTransparency = 1,
+            Visible = (tabData.Name == "Home")
+        }, self.Content)
+        create("UIListLayout", {
+            Padding = UDim.new(0,8),
+            FillDirection = Enum.FillDirection.Vertical,
+            SortOrder = Enum.SortOrder.LayoutOrder
+        }, container)
+        
+        create("TextLabel", {
+            Size = UDim2.new(1,0,0,36),
+            BackgroundTransparency = 1,
+            Text = tabData.Name .. " Panel",
+            TextColor3 = Color3.fromRGB(200,200,200),
+            TextSize = 18,
+            Font = Enum.Font.GothamSemibold
+        }, container)
+        
+        self.TabContainers[tabData.Name] = container
+    end
+end
+
+function ModernAdminLib:SwitchTab(tabName)
+    for name, cont in pairs(self.TabContainers) do
+        cont.Visible = (name == tabName)
+    end
+    
+    -- Update button highlight (opsional, tambah kalau mau)
+    self.ActiveTab = tabName
+end
+
+function ModernAdminLib:ToggleMinimize()
+    if self.IsMinimized then
+        self.IsMinimized = false
+        self.MinimizeBtn.Text = "−"
+        self.Blur.Enabled = true
+        self.TitleLabel.Visible = false
+        self.Sidebar.Visible = true
+        self.Content.Visible = true
+        
+        TweenService:Create(self.MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine), {Size = UDim2.new(0, 300, 0, 380)}):Play()
+    else
+        self.IsMinimized = true
+        self.MinimizeBtn.Text = "+"
+        self.Blur.Enabled = false
+        self.TitleLabel.Visible = true
+        self.Sidebar.Visible = false
+        self.Content.Visible = false
+        
+        TweenService:Create(self.MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine), {Size = UDim2.new(0, 220, 0, 38)}):Play()
+    end
+end
+
+function ModernAdminLib:SetupDragging()
+    local dragging, dragStart, startPos = false, nil, nil
+    
+    self.MainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local absPos = self.MainFrame.AbsolutePosition
+            if input.Position.Y - absPos.Y <= 45 then
+                local btnAbs = self.MinimizeBtn.AbsolutePosition
+                local btnSize = self.MinimizeBtn.AbsoluteSize
+                local inBtn = input.Position.X >= btnAbs.X and input.Position.X <= btnAbs.X + btnSize.X
+                              and input.Position.Y >= btnAbs.Y and input.Position.Y <= btnAbs.Y + btnSize.Y
+                
+                if not inBtn then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = self.MainFrame.Position
+                    
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                    end)
+                end
+            end
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            self.MainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Method untuk tambah opsi ke tab tertentu
+function ModernAdminLib:AddToggle(tabName, label, default, callback)
+    local tab = self.TabContainers[tabName]
+    if not tab then return end
+    
+    local frame = create("Frame", {
+        Size = UDim2.new(0.95, 0, 0, 38),
+        BackgroundColor3 = Color3.fromRGB(45,45,45),
+        BorderSizePixel = 0
+    }, tab)
+    create("UICorner", {CornerRadius = UDim.new(0,6)}, frame)
+    
+    create("TextLabel", {
+        Size = UDim2.new(0.65, 0, 1, 0),
+        Position = UDim2.new(0.03, 0, 0, 0),
+        BackgroundTransparency = 1,
+        Text = label,
+        TextColor3 = Color3.fromRGB(220,220,220),
+        TextSize = 14,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left
+    }, frame)
+    
+    local toggleBtn = create("TextButton", {
+        Size = UDim2.new(0.25, 0, 0.7, 0),
+        Position = UDim2.new(0.7, 0, 0.15, 0),
+        Text = default and "ON" or "OFF",
+        BackgroundColor3 = default and Color3.fromRGB(50,200,50) or Color3.fromRGB(150,50,50),
+        TextColor3 = Color3.fromRGB(255,255,255),
+        Font = Enum.Font.GothamBold,
+        TextSize = 12
+    }, frame)
+    create("UICorner", {CornerRadius = UDim.new(0,6)}, toggleBtn)
+    
+    local state = default or false
+    toggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        toggleBtn.Text = state and "ON" or "OFF"
+        TweenService:Create(toggleBtn, TweenInfo.new(0.2), {
+            BackgroundColor3 = state and Color3.fromRGB(50,200,50) or Color3.fromRGB(150,50,50)
+        }):Play()
+        if callback then callback(state) end
+    end)
+end
+
+-- Tambah method lain (slider, button, dropdown, dll) sesuai kebutuhan
+
+return ModernAdminLib
